@@ -136,7 +136,8 @@ async function pollVerdict(env, sid, polls = POLLS) {
       const r = await fetch(`${LC}/submissions/detail/${sid}/check/`, { headers: lcHeaders(env) });
       if (!r.ok) continue;
       const j = await r.json();
-      if (j.state === "FINISHED") return j;
+      // LeetCode marks completed judging with state "SUCCESS" (older "FINISHED" kept for safety)
+      if (j.state === "SUCCESS" || j.state === "FINISHED") return j;
     } catch {
       /* transient; keep polling */
     }

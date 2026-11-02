@@ -167,7 +167,8 @@ async function pollVerdict(sid) {
         continue;
       }
       if (i === 0) console.log(`[judge] first poll: state=${j.state} status=${j.status_msg}`);
-      if (j.state === "FINISHED") return j;
+      // LeetCode marks completed judging with state "SUCCESS" (older "FINISHED" kept for safety)
+      if (j.state === "SUCCESS" || j.state === "FINISHED") return j;
     } catch (e) {
       if (i === 0) console.log(`[judge] poll threw: ${String(e).slice(0, 100)}`);
     }
@@ -216,7 +217,6 @@ async function askAI(prompt) {
   const routes = [
     () => pollinationsChat("openai", prompt),
     () => pollinationsGet(prompt),
-    () => pollinationsChat("mistral", prompt),
   ];
   let lastErr = "";
   for (const route of routes) {
