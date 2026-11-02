@@ -212,10 +212,19 @@ function buildPrompt(statement, starter, feedback, prevCode) {
   return p;
 }
 
-/** GitHub Models retired July 2026 — using pollinations.ai (free, keyless) instead. */
+/** GitHub Models retired July 2026 — using pollinations.ai (free, keyless) instead.
+ *  Free tier allows ~1 reply / 45s per IP, so calls are paced with a module-level clock. */
+let lastAIAt = 0;
+
 async function askAI(prompt) {
+  const wait = 46000 - (Date.now() - lastAIAt);
+  if (wait > 0) {
+    console.log(`[ai] pacing ${wait}ms before call`);
+    await sleep(wait);
+  }
   const routes = [
-    () => pollinationsChat("openai", prompt),
+    () => pollinationsChat("openai-fast", prompt), // gpt-oss-20b, clean non-reasoning output
+    () => pollinationsChat("openai", prompt), // reasoning model, fallback
     () => pollinationsGet(prompt),
   ];
   let lastErr = "";
@@ -244,8 +253,9 @@ async function pollinationsChat(model, prompt) {
   const r = await fetch("https://text.pollinations.ai/openai", {
     method: "POST",
     headers: { "content-type": "application/json", "user-agent": "lc-daily-bot" },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 3500 }),
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 6000 }),
   });
+  lastAIAt = Date.now();
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 100)}`);
   const j = await r.json();
   return j.choices?.[0]?.message?.content || "";
@@ -254,8 +264,9 @@ async function pollinationsChat(model, prompt) {
 async function pollinationsGet(prompt) {
   console.log("[ai] pollinations GET fallback");
   const r = await fetch(
-    `https://text.pollinations.ai/${encodeURIComponent(prompt.slice(0, 7000))}?model=openai`
+    `https://text.pollinations.ai/${encodeURIComponent(prompt.slice(0, 3500))}?model=openai-fast`
   );
+  lastAIAt = Date.now();
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.text();
 }
