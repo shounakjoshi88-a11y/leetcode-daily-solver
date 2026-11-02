@@ -4,11 +4,12 @@
   "frontendId": 593,
   "title": "Valid Square",
   "difficulty": "Medium",
-  "accepted": false,
+  "accepted": true,
   "attempts": 1,
   "log": [
     {
-      "attempt": 1
+      "attempt": 1,
+      "status": "Accepted"
     }
   ],
   "submissionId": 2187950205,
