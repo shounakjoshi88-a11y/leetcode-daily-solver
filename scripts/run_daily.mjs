@@ -233,7 +233,10 @@ async function askAI(prompt) {
       try {
         const out = await route();
         if (out && out.trim()) return out;
+        // runner IPs share pollinations' anonymous quota — empty 200s happen; pace and retry
+        console.log(`[ai] empty response (try ${tries + 1}), pacing before retry`);
         lastErr = "empty response";
+        await sleep(46000);
       } catch (e) {
         lastErr = String(e).slice(0, 150);
         console.log(`[ai] route failed: ${lastErr}`);
@@ -258,7 +261,19 @@ async function pollinationsChat(model, prompt) {
   lastAIAt = Date.now();
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 100)}`);
   const j = await r.json();
-  return j.choices?.[0]?.message?.content || "";
+  const msg = j.choices?.[0]?.message || {};
+  const content = msg.content || "";
+  if (!content.trim()) {
+    // gpt-oss sometimes writes the code into its hidden reasoning — mine it as a fallback
+    const reasoning = msg.reasoning || "";
+    const fromReasoning = reasoning.slice(reasoning.indexOf("class Solution"));
+    if (fromReasoning.includes("class Solution")) {
+      console.log("[ai] content empty but code found in reasoning — using it");
+      return fromReasoning;
+    }
+    console.log(`[ai] diagnostics: finish=${j.choices?.[0]?.finish_reason} usage=${JSON.stringify(j.usage || {})} reasoningLen=${reasoning.length}`);
+  }
+  return content;
 }
 
 async function pollinationsGet(prompt) {
