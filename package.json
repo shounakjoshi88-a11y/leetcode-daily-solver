@@ -1,0 +1,12 @@
+{
+  "name": "leetcode-daily-solver",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Autonomous daily LeetCode solver on Cloudflare Workers: picks one random unsolved problem a day, solves it with Workers AI, submits to leetcode.com.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail --format pretty"
+  }
+}
