@@ -54,7 +54,10 @@ async function gql(query, variables) {
     headers: { ...lcHeaders(), "content-type": "application/json" },
     body: JSON.stringify({ query, variables }),
   });
-  if (!r.ok) throw new Error(`graphql ${r.status}`);
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    throw new Error(`graphql ${r.status}: ${body.slice(0, 150)}`);
+  }
   const j = await r.json();
   if (j.errors) throw new Error("graphql: " + JSON.stringify(j.errors).slice(0, 200));
   return j;
@@ -115,7 +118,7 @@ async function getQuestion(slug) {
   const j = await gql(
     `query q($s: String!) { question(titleSlug: $s) {
       questionId questionFrontendId title difficulty content
-      codeSnippets(languageSlug: "python3") { lang langSlug code }
+      codeSnippets(langSlug: "python3") { lang langSlug code }
     } }`,
     { s: slug }
   );
