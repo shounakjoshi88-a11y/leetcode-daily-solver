@@ -99,7 +99,7 @@ async function getQuestion(env, slug) {
     env,
     `query q($s: String!) { question(titleSlug: $s) {
       questionId questionFrontendId title difficulty content
-      codeSnippets(langSlug: "python3") { lang langSlug code }
+      codeSnippets { lang langSlug code }
     } }`,
     { s: slug }
   );
