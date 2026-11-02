@@ -20,9 +20,9 @@ state, Supabase Edge Function + pg_cron. Not needed unless Cloudflare is blocked
 |---|---|
 | Runtime | Cloudflare Worker, `src/worker.js` (single file) |
 | Cron | `30 3 * * *` UTC = 09:00 IST daily |
-| LLM | `@cf/qwen/qwen2.5-coder-32b-instruct`, fallback `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
-| State | KV namespace `STATE` |
-| Auth | Secrets: `LEETCODE_SESSION`, `CSRFTOKEN`, `TRIGGER_SECRET` (guards `/run`) |
+| LLM | **live (GitHub path):** pollinations.ai `openai-fast` (gpt-oss-20b, keyless; 45 s/IP free-tier pacing, 402→backoff, empty-200→retry w/ reasoning-mining). **CF path:** `@cf/qwen/qwen2.5-coder-32b-instruct` → `llama-3.3-70b` (better on Hards; awaiting one OAuth click) |
+| State | GH path: `state/*.json` committed back. CF path: KV namespace `STATE` |
+| Auth | GH: repo actions secrets `LEETCODE_SESSION`, `CSRFTOKEN`. CF: worker secrets + `TRIGGER_SECRET` |
 
 ## Daily flow (scheduled handler)
 
@@ -68,11 +68,17 @@ Comfortable; if LeetCode judge is slow the final attempt gets a patient re-poll.
 
 ## Known risks
 
-- **Datacenter IP + LeetCode**: submit/check endpoints usually accept session-cookie JSON from
-  server IPs; if Cloudflare bot protection blocks, fall back to GitHub Actions runner path.
-- **Free CPU limits**: JSON parsing kept minimal (compact cached list); awaits dominate runtime.
-- **LLM success rate**: expectation ~70-85% of days Accepted (Easy/Medium weighted); failures are
-  visible on the dashboard and the cooldown lets the pool keep moving.
+- **Datacenter IP + LeetCode**: submit/check endpoints accept session-cookie JSON from GitHub
+  runner IPs (verified live 2026-11-02: submissions returned 200 + judged). Watch for future WAF changes.
+- **LLM free tier**: pollinations anonymous tier allows ~1 reply / 45 s per IP and a ~2k-token
+  output cap; runner IPs are shared, so some calls return empty 200s (handled: paced retries,
+  reasoning-field mining, GET fallback). Hard problems occasionally exhaust the output cap —
+  the Cloudflare Workers AI path (qwen2.5-coder-32b) removes this cap once deployed.
+- **Judge semantics**: terminal judge state is `SUCCESS` (not `FINISHED`); `codeSnippets` takes
+  no arguments (filter client-side); GraphQL `submitCode` mutation does not exist — use the REST
+  submit endpoint.
+- **Session expiry**: LEETCODE_SESSION is a long-lived JWT; if it dies, submissions 403 and the
+  run records the error on the dashboard.
 
 ## End of season
 

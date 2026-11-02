@@ -11,7 +11,7 @@ after **2026-12-31**.
 | | GitHub Actions (live) | Cloudflare Workers (ready) |
 |---|---|---|
 | Cron | `30 3 * * *` UTC workflow | `30 3 * * *` trigger |
-| LLM | GitHub Models (`gpt-4.1-mini` → `DeepSeek-V3` → `gpt-4o-mini`) | Workers AI (`qwen2.5-coder-32b` → `llama-3.3-70b`) |
+| LLM | pollinations.ai keyless (`gpt-oss-20b` via `openai-fast`, ~45 s/IP free-tier pacing) | Workers AI (`qwen2.5-coder-32b` → `llama-3.3-70b`) |
 | State | `state/*.json` committed back to the repo | KV namespace `STATE` |
 | Dashboard | GitHub Pages (`index.html` + `DASHBOARD.md`) | served by the worker |
 | Manual run | Actions → "Run workflow" (force checkbox) | `POST /run?secret=…` |
