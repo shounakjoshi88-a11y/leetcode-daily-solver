@@ -154,11 +154,22 @@ async function pollVerdict(sid) {
     await sleep(POLL_MS);
     try {
       const r = await fetch(`${LC}/submissions/detail/${sid}/check/`, { headers: lcHeaders() });
-      if (!r.ok) continue;
-      const j = await r.json();
+      if (!r.ok) {
+        if (i === 0) console.log(`[judge] poll status ${r.status}`);
+        continue;
+      }
+      const t = await r.text();
+      let j;
+      try {
+        j = JSON.parse(t);
+      } catch {
+        if (i === 0) console.log(`[judge] non-json poll body: ${t.slice(0, 100).replace(/\n/g, " ")}`);
+        continue;
+      }
+      if (i === 0) console.log(`[judge] first poll: state=${j.state} status=${j.status_msg}`);
       if (j.state === "FINISHED") return j;
-    } catch {
-      /* transient */
+    } catch (e) {
+      if (i === 0) console.log(`[judge] poll threw: ${String(e).slice(0, 100)}`);
     }
   }
   return null;
