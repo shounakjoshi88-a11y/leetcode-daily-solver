@@ -48,19 +48,33 @@
   
       <div class="card">
         <div class="k">Today · 2026-11-02</div>
-        <div class="big">#279 — Perfect Squares <span class="b med">Medium</span></div>
-        <div class="verdict bad">❌ Not accepted · 1 attempt</div>
-        <ul class="log"><li>attempt 1: ai_error — Error: all AI routes failed: Error: HTTP 404</li></ul>
+        <div class="big">#2127 — Maximum Employees to Be Invited to a Meeting <span class="b hard">Hard</span></div>
+        <div class="verdict bad">❌ Not accepted · 2 attempts</div>
+        <ul class="log"><li>attempt 1: Wrong Answer (0/99)</li><li>attempt 2: ai_error — Error: all AI routes failed: Error: HTTP 400</li></ul>
         
         <div class="links">
-          <a href="https://leetcode.com/problems/perfect-squares/" target="_blank" rel="noopener">problem ↗</a>
-          
+          <a href="https://leetcode.com/problems/maximum-employees-to-be-invited-to-a-meeting/" target="_blank" rel="noopener">problem ↗</a>
+           <a href="https://leetcode.com/submissions/detail/2187968645/" target="_blank" rel="noopener">submission ↗</a>
         </div>
-        
+        <details><summary>solution</summary><pre>class Solution:
+    def maximumInvitations(self, favorite: list[int]) -&gt; int:
+        n = len(favorite)
+        rev = [[] for _ in range(n)]
+        for i, j in enumerate(favorite):
+            rev[j].append(i)
+
+        visited = [0] * n  # 0 unvisited, 1 in stack
+</pre></details>
       </div>
   <div class="card">
     <div class="k" style="margin-bottom:8px">History</div>
     <table><tr><th>Date</th><th>Problem</th><th>Diff</th><th>Result</th><th>Runtime</th></tr><tr>
+        <td>2026-11-02</td>
+        <td><a href="https://leetcode.com/problems/maximum-employees-to-be-invited-to-a-meeting/" target="_blank" rel="noopener">#2127 Maximum Employees to Be Invited to a Meeting</a></td>
+        <td><span class="b hard">Hard</span></td>
+        <td><span class="bad">❌</span> <span class="dim">2×</span></td>
+        <td>—</td>
+      </tr><tr>
         <td>2026-11-02</td>
         <td><a href="https://leetcode.com/problems/perfect-squares/" target="_blank" rel="noopener">#279 Perfect Squares</a></td>
         <td><span class="b med">Medium</span></td>
