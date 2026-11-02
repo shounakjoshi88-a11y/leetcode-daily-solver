@@ -1,30 +1,23 @@
 # LeetCode Daily Solver
 
-Autonomous "1 LeetCode problem a day" bot on **Cloudflare Workers** (free tier).
+Autonomous "1 LeetCode problem a day" bot. Every morning at **9:00 AM IST** it picks a **random
+unsolved problem from all of LeetCode** (no repeats, premium skipped; weighted ~30% Easy /
+45% Medium / 25% Hard), has an LLM solve it in Python 3, submits to leetcode.com with the user's
+session, polls the judge, and **feeds failures back to the model** (max 5 attempts). Goes dormant
+after **2026-12-31**.
 
-- **Cron** 09:00 IST daily (`30 3 * * *` UTC) → picks a **random unsolved problem from all of LeetCode** (no repeats, premium skipped), weighted ~30% Easy / 45% Medium / 25% Hard.
-- **Workers AI** (`qwen2.5-coder-32b`, fallback `llama-3.3-70b`) solves it in Python 3.
-- Submits via LeetCode's web API with the user's session, polls the judge, and **feeds failures back to the model** (max 5 attempts).
-- State in **KV**: solved-slug set, attempt map (7-day retry cooldown), history.
-- Public **dashboard** at the worker URL; `GET /api/state` for JSON; `POST /run?secret=…` for manual runs.
-- Goes dormant after **2026-12-31**.
+## Two interchangeable runtimes
 
-## Layout
+| | GitHub Actions (live) | Cloudflare Workers (ready) |
+|---|---|---|
+| Cron | `30 3 * * *` UTC workflow | `30 3 * * *` trigger |
+| LLM | GitHub Models (`gpt-4.1-mini` → `DeepSeek-V3` → `gpt-4o-mini`) | Workers AI (`qwen2.5-coder-32b` → `llama-3.3-70b`) |
+| State | `state/*.json` committed back to the repo | KV namespace `STATE` |
+| Dashboard | GitHub Pages (`index.html` + `DASHBOARD.md`) | served by the worker |
+| Manual run | Actions → "Run workflow" (force checkbox) | `POST /run?secret=…` |
 
-- `src/worker.js` — everything: cron, solve loop, dashboard.
-- `wrangler.jsonc` — bindings (KV `STATE`, AI, cron).
-
-## Setup / runbook
-
-```powershell
-wrangler login
-wrangler kv namespace create STATE      # paste the id into wrangler.jsonc
-wrangler deploy
-wrangler secret put LEETCODE_SESSION    # value from browser cookies
-wrangler secret put CSRFTOKEN
-wrangler secret put TRIGGER_SECRET      # random hex, guards /run
-```
-
-Manual run: `POST https://leetcode-daily-solver.<subdomain>.workers.dev/run?secret=<TRIGGER_SECRET>`
+- **GitHub path (deployed)**: `.github/workflows/daily.yml` + `scripts/run_daily.mjs` (zero deps).
+  Secrets: `LEETCODE_SESSION`, `CSRFTOKEN` (repo actions secrets).
+- **Cloudflare path**: `src/worker.js` + `wrangler.jsonc` — `wrangler deploy` once logged in.
 
 Design doc: `docs/superpowers/specs/2026-11-02-leetcode-daily-solver-design.md`
