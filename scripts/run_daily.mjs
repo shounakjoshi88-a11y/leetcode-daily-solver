@@ -200,42 +200,53 @@ function buildPrompt(statement, starter, feedback, prevCode) {
   return p;
 }
 
+/** GitHub Models retired July 2026 — using pollinations.ai (free, keyless) instead. */
 async function askAI(prompt) {
-  const models = ["openai/gpt-4.1-mini", "deepseek/DeepSeek-V3-0324", "openai/gpt-4o-mini"];
+  const routes = [
+    () => pollinationsChat("openai", prompt),
+    () => pollinationsGet(prompt),
+    () => pollinationsChat("mistral", prompt),
+  ];
   let lastErr = "";
-  for (const model of models) {
-    try {
-      const r = await fetch("https://models.github.ai/inference/chat/completions", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${env.GITHUB_TOKEN}`,
-          "content-type": "application/json",
-          "user-agent": "lc-daily-bot",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.2,
-          max_tokens: 3000,
-        }),
-      });
-      if (!r.ok) {
-        lastErr = `${model} -> ${r.status}`;
-        console.log(`[ai] ${lastErr}`);
-        continue;
+  for (const route of routes) {
+    for (let tries = 0; tries < 3; tries++) {
+      try {
+        const out = await route();
+        if (out && out.trim()) return out;
+        lastErr = "empty response";
+      } catch (e) {
+        lastErr = String(e).slice(0, 150);
+        console.log(`[ai] route failed: ${lastErr}`);
+        if (/FREE_LIMIT|45 seconds/i.test(lastErr)) {
+          await sleep(50000); // free tier: 1 reply / 45s per IP
+          continue;
+        }
+        break;
       }
-      const j = await r.json();
-      const text = j.choices?.[0]?.message?.content;
-      if (text?.trim()) {
-        console.log(`[ai] used ${model}`);
-        return text;
-      }
-      lastErr = `${model} -> empty`;
-    } catch (e) {
-      lastErr = `${model} -> ${String(e).slice(0, 120)}`;
     }
   }
-  throw new Error("all models failed: " + lastErr);
+  throw new Error("all AI routes failed: " + lastErr);
+}
+
+async function pollinationsChat(model, prompt) {
+  console.log(`[ai] pollinations chat model=${model}`);
+  const r = await fetch("https://text.pollinations.ai/openai", {
+    method: "POST",
+    headers: { "content-type": "application/json", "user-agent": "lc-daily-bot" },
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 3500 }),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 100)}`);
+  const j = await r.json();
+  return j.choices?.[0]?.message?.content || "";
+}
+
+async function pollinationsGet(prompt) {
+  console.log("[ai] pollinations GET fallback");
+  const r = await fetch(
+    `https://text.pollinations.ai/${encodeURIComponent(prompt.slice(0, 7000))}?model=openai`
+  );
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.text();
 }
 
 function extractCode(text) {
