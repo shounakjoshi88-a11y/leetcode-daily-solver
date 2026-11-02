@@ -201,7 +201,7 @@ function buildPrompt(statement, starter, feedback, prevCode) {
     `RULES:\n` +
     `- Output ONLY the complete Python 3 code, no markdown fences, no prose.\n` +
     `- No imports unless absolutely necessary.\n` +
-    `- Add a short comment above each nontrivial line explaining what it does.\n` +
+    `- At most 5 very short comments at the trickiest lines (brevity matters — long answers get truncated).\n` +
     `- Must be efficient enough to satisfy the constraints.\n`;
   if (feedback) {
     p +=
