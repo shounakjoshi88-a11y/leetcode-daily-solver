@@ -48,20 +48,77 @@
   
       <div class="card">
         <div class="k">Today · 2026-11-02</div>
-        <div class="big">#1115 — Print FooBar Alternately <span class="b med">Medium</span></div>
-        <div class="verdict bad">❌ Not accepted · 1 attempt</div>
-        <ul class="log"><li>attempt 1: ai_error — Error: all models failed: openai/gpt-4o-mini -&gt; SyntaxError: Unexpected token 'O', &quot;OK
-&quot; is not valid JSON</li></ul>
+        <div class="big">#3765 — Complete Prime Number <span class="b med">Medium</span></div>
+        <div class="verdict bad">❌ Not accepted · 5 attempts</div>
+        <ul class="log"><li>attempt 1: judge_timeout</li><li>attempt 2: judge_timeout</li><li>attempt 3: judge_timeout</li><li>attempt 4: judge_timeout</li><li>attempt 5: judge_timeout</li></ul>
         
         <div class="links">
-          <a href="https://leetcode.com/problems/print-foobar-alternately/" target="_blank" rel="noopener">problem ↗</a>
-          
+          <a href="https://leetcode.com/problems/complete-prime-number/" target="_blank" rel="noopener">problem ↗</a>
+           <a href="https://leetcode.com/submissions/detail/2187945486/" target="_blank" rel="noopener">submission ↗</a>
         </div>
-        
+        <details><summary>solution</summary><pre>class Solution:
+    def completePrime(self, num: int) -&gt; bool:
+        # fast deterministic prime test for 32‑bit integers
+        def is_prime(n: int) -&gt; bool:
+            if n &lt; 2: return False
+            small_primes = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31)
+            for p in small_primes:
+                if n % p == 0:
+                    return n == p
+            # write n-1 as d * 2^s
+            d, s = n - 1, 0
+            while d % 2 == 0:
+                d //= 2
+                s += 1
+            # deterministic bases for n &lt; 2^32
+            for a in (2, 7, 61):
+                if a &gt;= n:
+                    continue
+                x = pow(a, d, n)
+                if x == 1 or x == n - 1:
+                    continue
+                for _ in range(s - 1):
+                    x = (x * x) % n
+                    if x == n - 1:
+                        break
+                else:
+                    return False
+            return True
+
+        s = str(num)
+        # single‑digit special case
+        if len(s) == 1:
+            return is_prime(num)
+
+        # early reject if any digit cannot be in a prime
+        for ch in s:
+            if ch not in '2357':
+                return False
+
+        # check all prefixes
+        cur = 0
+        for ch in s:
+            cur = cur * 10 + int(ch)
+            if not is_prime(cur):
+                return False
+
+        # check all suffixes
+        for i in range(1, len(s) + 1):
+            if not is_prime(int(s[-i:])):
+                return False
+
+        return True
+</pre></details>
       </div>
   <div class="card">
     <div class="k" style="margin-bottom:8px">History</div>
     <table><tr><th>Date</th><th>Problem</th><th>Diff</th><th>Result</th><th>Runtime</th></tr><tr>
+        <td>2026-11-02</td>
+        <td><a href="https://leetcode.com/problems/complete-prime-number/" target="_blank" rel="noopener">#3765 Complete Prime Number</a></td>
+        <td><span class="b med">Medium</span></td>
+        <td><span class="bad">❌</span> <span class="dim">5×</span></td>
+        <td>—</td>
+      </tr><tr>
         <td>2026-11-02</td>
         <td><a href="https://leetcode.com/problems/print-foobar-alternately/" target="_blank" rel="noopener">#1115 Print FooBar Alternately</a></td>
         <td><span class="b med">Medium</span></td>
