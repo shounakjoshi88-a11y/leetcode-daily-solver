@@ -8,14 +8,15 @@ One random unsolved LeetCode problem a day (9:00 AM IST), solved by an LLM and s
 
 ## Today — 2026-11-02
 
-**#3765 — Complete Prime Number** (Medium) — ❌ not accepted · 5 attempt(s)
+**#593 — Valid Square** (Medium) — ❌ not accepted · 3 attempt(s)
 
-[problem](https://leetcode.com/problems/complete-prime-number/) · [submission](https://leetcode.com/submissions/detail/2187945486/)
+[problem](https://leetcode.com/problems/valid-square/) · [submission](https://leetcode.com/submissions/detail/2187950205/)
 
 ## History
 
 | Date | Problem | Diff | Result | Runtime |
 |---|---|---|---|---|
+| 2026-11-02 | [#593 Valid Square](https://leetcode.com/problems/valid-square/) | 🟡 Medium | ❌ (3×) | — |
 | 2026-11-02 | [#3765 Complete Prime Number](https://leetcode.com/problems/complete-prime-number/) | 🟡 Medium | ❌ (5×) | — |
 | 2026-11-02 | [#1115 Print FooBar Alternately](https://leetcode.com/problems/print-foobar-alternately/) | 🟡 Medium | ❌ (1×) | — |
 | 2026-11-02 | [#1437 check-if-all-1s-are-at-least-length-k-places-away](https://leetcode.com/problems/check-if-all-1s-are-at-least-length-k-places-away/) | 🟢 Easy | ❌ (0×) | — |
