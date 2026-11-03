@@ -6,7 +6,10 @@
  *   1. gate: stop after 2026-12-31; skip if today's run already recorded (unless forced)
  *   2. load problem pool from state/problems.json (refresh weekly; seeds solved-set from AC statuses)
  *   3. pick a random unsolved problem weighted ~30% Easy / 45% Medium / 25% Hard
- *   4. solve with GitHub Models LLM (feedback loop, max 5 attempts)
+ *   4. solve with pollinations.ai LLM (feedback loop, max 5 attempts)
+ *
+ * `--render` flag: skip solving entirely and regenerate index.html + DASHBOARD.md
+ * from the existing state files (used to resync the Pages dashboard without a run).
  *   5. submit to leetcode.com with session cookie, poll the judge
  *   6. persist state/*.json + regenerate index.html and DASHBOARD.md (workflow commits them)
  */
@@ -530,7 +533,7 @@ function renderHtml({ today, history, accountSolved, poolSize }) {
     <div class="k" style="margin-bottom:8px">History</div>
     ${rows ? `<table><tr><th>Date</th><th>Problem</th><th>Diff</th><th>Result</th><th>Runtime</th></tr>${rows}</table>` : `<div class="dim">No runs yet.</div>`}
   </div>
-  <footer>GitHub Actions cron 30 3 * * * UTC · GitHub Models LLM · state committed to repo</footer>
+  <footer>GitHub Actions cron 30 3 * * * UTC · pollinations.ai LLM · state committed to repo</footer>
 </main></body></html>`;
 }
 
@@ -561,6 +564,27 @@ function renderMarkdown({ today, history, accountSolved, poolSize }) {
 /* ---------------- main ---------------- */
 
 async function main() {
+  // --render: rebuild the dashboards from existing state without solving anything
+  if (process.argv.includes("--render")) {
+    const today = loadJSON("today.json", null);
+    const history = loadJSON("history.json", []);
+    const pool = loadJSON("problems.json", { problems: [] });
+    const problems = Array.isArray(pool.problems) ? pool.problems : [];
+    const acCount = problems.filter((p) => p.ac).length;
+    writeFileSync(
+      "index.html",
+      renderHtml({ today, history, accountSolved: acCount, poolSize: problems.length })
+    );
+    writeFileSync(
+      "DASHBOARD.md",
+      renderMarkdown({ today, history, accountSolved: acCount, poolSize: problems.length })
+    );
+    console.log(
+      `[render] dashboards regenerated from state (today=${today?.slug ?? "none"}, history=${history.length})`
+    );
+    return;
+  }
+
   const date = istDate();
   console.log(`[run] IST date: ${date}, force: ${FORCE}`);
   if (date > END_DATE) {

@@ -4,24 +4,16 @@ One random unsolved LeetCode problem a day (9:00 AM IST), solved by an LLM and s
 
 | Solved by bot | Streak | Success rate | Account AC | Pool |
 |---|---|---|---|---|
-| 0 | 0🔥 | 0% | 118 | 4100 |
+| 1 | 1🔥 | 100% | 118 | 4100 |
 
 ## Today — 2026-11-02
 
-**#2127 — Maximum Employees to Be Invited to a Meeting** (Hard) — ❌ not accepted · 2 attempt(s)
+**#593 — Valid Square** (Medium) — ✅ Accepted · 0 ms · 1 attempt(s)
 
-[problem](https://leetcode.com/problems/maximum-employees-to-be-invited-to-a-meeting/) · [submission](https://leetcode.com/submissions/detail/2187968645/)
+[problem](https://leetcode.com/problems/valid-square/) · [submission](https://leetcode.com/submissions/detail/2187950205/)
 
 ## History
 
 | Date | Problem | Diff | Result | Runtime |
 |---|---|---|---|---|
-| 2026-11-02 | [#2127 Maximum Employees to Be Invited to a Meeting](https://leetcode.com/problems/maximum-employees-to-be-invited-to-a-meeting/) | 🔴 Hard | ❌ (2×) | — |
-| 2026-11-02 | [#279 Perfect Squares](https://leetcode.com/problems/perfect-squares/) | 🟡 Medium | ❌ (1×) | — |
-| 2026-11-02 | [#2763 Sum of Imbalance Numbers of All Subarrays](https://leetcode.com/problems/sum-of-imbalance-numbers-of-all-subarrays/) | 🔴 Hard | ❌ (1×) | — |
-| 2026-11-02 | [#2914 Minimum Number of Changes to Make Binary String Beautiful](https://leetcode.com/problems/minimum-number-of-changes-to-make-binary-string-beautiful/) | 🟡 Medium | ❌ (1×) | — |
-| 2026-11-02 | [#593 Valid Square](https://leetcode.com/problems/valid-square/) | 🟡 Medium | ❌ (3×) | — |
-| 2026-11-02 | [#3765 Complete Prime Number](https://leetcode.com/problems/complete-prime-number/) | 🟡 Medium | ❌ (5×) | — |
-| 2026-11-02 | [#1115 Print FooBar Alternately](https://leetcode.com/problems/print-foobar-alternately/) | 🟡 Medium | ❌ (1×) | — |
-| 2026-11-02 | [#1437 check-if-all-1s-are-at-least-length-k-places-away](https://leetcode.com/problems/check-if-all-1s-are-at-least-length-k-places-away/) | 🟢 Easy | ❌ (0×) | — |
-| 2026-11-02 | [#1614 maximum-nesting-depth-of-the-parentheses](https://leetcode.com/problems/maximum-nesting-depth-of-the-parentheses/) | 🟢 Easy | ❌ (0×) | — |
+| 2026-11-02 | [#593 Valid Square](https://leetcode.com/problems/valid-square/) | 🟡 Medium | ✅ (1×) | 0 ms |

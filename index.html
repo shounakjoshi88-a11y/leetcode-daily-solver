@@ -38,91 +38,70 @@
   <h1>LeetCode Daily Solver<span class="dot">_</span></h1>
   <div class="sub">One random unsolved problem every day at 9:00 AM IST, solved by AI and submitted to leetcode.com — through Dec 31, 2026. No repeats.</div>
   <div class="chips">
-    <div class="chip"><div class="n">0</div><div class="l">solved by bot</div></div>
-    <div class="chip"><div class="n">0🔥</div><div class="l">streak</div></div>
-    <div class="chip"><div class="n">0%</div><div class="l">success rate</div></div>
+    <div class="chip"><div class="n">1</div><div class="l">solved by bot</div></div>
+    <div class="chip"><div class="n">1🔥</div><div class="l">streak</div></div>
+    <div class="chip"><div class="n">100%</div><div class="l">success rate</div></div>
     <div class="chip"><div class="n">118</div><div class="l">total account AC</div></div>
-    <div class="chip"><div class="n">59</div><div class="l">days remaining</div></div>
+    <div class="chip"><div class="n">58</div><div class="l">days remaining</div></div>
     <div class="chip"><div class="n">4100</div><div class="l">problem pool</div></div>
   </div>
   
       <div class="card">
         <div class="k">Today · 2026-11-02</div>
-        <div class="big">#2127 — Maximum Employees to Be Invited to a Meeting <span class="b hard">Hard</span></div>
-        <div class="verdict bad">❌ Not accepted · 2 attempts</div>
-        <ul class="log"><li>attempt 1: Wrong Answer (0/99)</li><li>attempt 2: ai_error — Error: all AI routes failed: Error: HTTP 400</li></ul>
+        <div class="big">#593 — Valid Square <span class="b med">Medium</span></div>
+        <div class="verdict ok">✅ Accepted · 0 ms · 1 attempt</div>
+        <ul class="log"><li>attempt 1: Accepted</li></ul>
         
         <div class="links">
-          <a href="https://leetcode.com/problems/maximum-employees-to-be-invited-to-a-meeting/" target="_blank" rel="noopener">problem ↗</a>
-           <a href="https://leetcode.com/submissions/detail/2187968645/" target="_blank" rel="noopener">submission ↗</a>
+          <a href="https://leetcode.com/problems/valid-square/" target="_blank" rel="noopener">problem ↗</a>
+           <a href="https://leetcode.com/submissions/detail/2187950205/" target="_blank" rel="noopener">submission ↗</a>
         </div>
         <details><summary>solution</summary><pre>class Solution:
-    def maximumInvitations(self, favorite: list[int]) -&gt; int:
-        n = len(favorite)
-        rev = [[] for _ in range(n)]
-        for i, j in enumerate(favorite):
-            rev[j].append(i)
+    def validSquare(self, p1: list[int], p2: list[int], p3: list[int], p4: list[int]) -&gt; bool:
+        # gather the four points into a list
+        pts = [p1, p2, p3, p4]
+        dists = []  # list to hold squared distances between each pair of points
 
-        visited = [0] * n  # 0 unvisited, 1 in stack
+        # compute squared distance for each of the 6 unique pairs
+        for i in range(4):
+            for j in range(i + 1, 4):
+                dx = pts[i][0] - pts[j][0]
+                dy = pts[i][1] - pts[j][1]
+                dists.append(dx * dx + dy * dy)
+
+        # order distances so the four smallest are sides and the largest two are diagonals
+        dists.sort()
+
+        # smallest distance must be positive (non-zero side length)
+        side = dists[0]
+        if side == 0:
+            return False
+
+        # verify that the first four distances (potential sides) are equal
+        for i in range(1, 4):
+            if dists[i] != side:
+                return False
+
+        # verify that the last two distances (potential diagonals) are equal
+        if dists[4] != dists[5]:
+            return False
+
+        # ensure right angles by checking Pythagorean theorem for diagonals
+        if dists[4] != 2 * side:
+            return False
+
+        return True
 </pre></details>
       </div>
   <div class="card">
     <div class="k" style="margin-bottom:8px">History</div>
     <table><tr><th>Date</th><th>Problem</th><th>Diff</th><th>Result</th><th>Runtime</th></tr><tr>
         <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/maximum-employees-to-be-invited-to-a-meeting/" target="_blank" rel="noopener">#2127 Maximum Employees to Be Invited to a Meeting</a></td>
-        <td><span class="b hard">Hard</span></td>
-        <td><span class="bad">❌</span> <span class="dim">2×</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/perfect-squares/" target="_blank" rel="noopener">#279 Perfect Squares</a></td>
-        <td><span class="b med">Medium</span></td>
-        <td><span class="bad">❌</span> <span class="dim">1×</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/sum-of-imbalance-numbers-of-all-subarrays/" target="_blank" rel="noopener">#2763 Sum of Imbalance Numbers of All Subarrays</a></td>
-        <td><span class="b hard">Hard</span></td>
-        <td><span class="bad">❌</span> <span class="dim">1×</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/minimum-number-of-changes-to-make-binary-string-beautiful/" target="_blank" rel="noopener">#2914 Minimum Number of Changes to Make Binary String Beautiful</a></td>
-        <td><span class="b med">Medium</span></td>
-        <td><span class="bad">❌</span> <span class="dim">1×</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
         <td><a href="https://leetcode.com/problems/valid-square/" target="_blank" rel="noopener">#593 Valid Square</a></td>
         <td><span class="b med">Medium</span></td>
-        <td><span class="bad">❌</span> <span class="dim">3×</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/complete-prime-number/" target="_blank" rel="noopener">#3765 Complete Prime Number</a></td>
-        <td><span class="b med">Medium</span></td>
-        <td><span class="bad">❌</span> <span class="dim">5×</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/print-foobar-alternately/" target="_blank" rel="noopener">#1115 Print FooBar Alternately</a></td>
-        <td><span class="b med">Medium</span></td>
-        <td><span class="bad">❌</span> <span class="dim">1×</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/check-if-all-1s-are-at-least-length-k-places-away/" target="_blank" rel="noopener">#1437 check-if-all-1s-are-at-least-length-k-places-away</a></td>
-        <td><span class="b easy">Easy</span></td>
-        <td><span class="bad">❌</span></td>
-        <td>—</td>
-      </tr><tr>
-        <td>2026-11-02</td>
-        <td><a href="https://leetcode.com/problems/maximum-nesting-depth-of-the-parentheses/" target="_blank" rel="noopener">#1614 maximum-nesting-depth-of-the-parentheses</a></td>
-        <td><span class="b easy">Easy</span></td>
-        <td><span class="bad">❌</span></td>
-        <td>—</td>
+        <td><span class="ok">✅</span> <span class="dim">1×</span></td>
+        <td>0 ms</td>
       </tr></table>
   </div>
-  <footer>GitHub Actions cron 30 3 * * * UTC · GitHub Models LLM · state committed to repo</footer>
+  <footer>GitHub Actions cron 30 3 * * * UTC · pollinations.ai LLM · state committed to repo</footer>
 </main></body></html>
