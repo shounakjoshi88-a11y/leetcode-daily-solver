@@ -1,7 +1,9 @@
 name: daily-solve
+# Scheduled run DISABLED 2026-11-03: the Cloudflare Worker (src/worker.js) is the
+# daily runner now (same 09:00 IST gate, driven by an every-minute step machine -
+# required by Workers free-plan CPU limits). This workflow is kept for MANUAL
+# BACKUP runs only - trigger it from the Actions tab if the Worker ever breaks.
 on:
-  schedule:
-    - cron: "30 3 * * *" # 09:00 IST
   workflow_dispatch:
     inputs:
       force:
