@@ -1,29 +1,41 @@
 /**
- * LeetCode Daily Solver — autonomous "1 problem a day" bot.
+ * LeetCode Daily Solver — autonomous "1 problem a day" bot (Cloudflare Workers, free plan).
  *
- * Every morning (09:00 IST cron) it:
- *   1. loads the full LeetCode problem list (cached in KV, refreshed weekly),
- *   2. filters to free, unsolved problems and picks one at random
- *      (weighted ~30% Easy / 45% Medium / 25% Hard),
- *   3. asks Workers AI to solve it in Python 3,
- *   4. submits to leetcode.com with the user's session and polls the judge,
- *   5. feeds judge failures back to the model and retries (max 5 attempts),
- *   6. records everything in KV; a public dashboard shows the results.
+ * Free-plan limits force a step-machine design: 10 ms CPU per invocation and
+ * ~30 s of waitUntil after an HTTP response make a monolithic solve loop
+ * impossible. So an every-minute cron drives a tiny state machine in KV:
  *
- * Never repeats a solved problem. Stops after 2026-12-31.
+ *   idle -> pick -> ai -> submit -> poll --(Accepted)--> record -> idle
+ *                                   ^                  |
+ *                                   +----(failed)------+   (up to MAX_ATTEMPTS)
  *
- * Bindings: STATE (KV), AI (Workers AI), secrets LEETCODE_SESSION, CSRFTOKEN, TRIGGER_SECRET.
+ * Each invocation executes EXACTLY ONE small step (~1-2 ms CPU), persists
+ * progress, and exits. The next cron tick (60 s later) continues. Steps are
+ * idempotent and resumable, so any crash just delays the run to the next tick.
+ *
+ * Daily gate: first tick at/after 03:31 UTC (09:01 IST) that finds no record
+ * for today's IST date starts the run. One problem per day, never repeated.
+ * The problem pool comes from the GitHub repo's state/problems.json (compact,
+ * already carries per-problem account-AC flags); refreshed weekly. Recent-AC
+ * slugs from LeetCode are cross-checked at pick time so manually-solved
+ * problems are never re-picked even when the pool file is days old.
+ *
+ * Bindings: STATE (KV), AI (Workers AI). Secrets: LEETCODE_SESSION, CSRFTOKEN,
+ * TRIGGER_SECRET. Stops after 2026-12-31.
  */
 
 const LC = "https://leetcode.com";
 const END_DATE = "2026-12-31"; // IST date after which the bot goes dormant
-const MAX_ATTEMPTS = 5; // AI solve attempts per problem
-const POLLS = 7; // judge polls per submission (POLL_MS apart)
-const POLL_MS = 5000;
-const WEEK_MS = 7 * 86400e3; // problem-list cache TTL + re-attempt cooldown
-const USER_AGENT =
+const START_UTC_MIN = 3 * 60 + 31; // earliest UTC minute the daily run may start (03:31)
+const MAX_ATTEMPTS = 3; // AI solve attempts per problem (Workers AI free-tier neuron budget)
+const MAX_POLLS = 10; // per-minute judge polls per submission before treating it as a timeout
+const WEEK_MS = 7 * 86400e3; // pool cache TTL + re-attempt cooldown
+const RUN_STALE_MS = 60 * 60e3; // a run older than this is force-finished as failed
+const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const DIFF_NAMES = { 1: "Easy", 2: "Medium", 3: "Hard" };
+const POOL_REPO_URL =
+  "https://raw.githubusercontent.com/shounakjoshi88-a11y/leetcode-daily-solver/main/state/problems.json";
 
 /* ---------------- time helpers ---------------- */
 
@@ -41,7 +53,7 @@ function lcHeaders(env, slug) {
     cookie: `LEETCODE_SESSION=${env.LEETCODE_SESSION}; csrftoken=${env.CSRFTOKEN}`,
     "x-csrftoken": env.CSRFTOKEN,
     "x-requested-with": "XMLHttpRequest",
-    "user-agent": USER_AGENT,
+    "user-agent": UA,
     referer: slug ? `${LC}/problems/${slug}/` : `${LC}/`,
     origin: LC,
     accept: "application/json, text/plain, */*",
@@ -63,34 +75,46 @@ async function gql(env, query, variables) {
   return j;
 }
 
-/** Full problem list, cached in KV for a week. Compact tuples to keep KV small. */
-async function getProblemList(env) {
+/** Compact problem pool, refreshed weekly from the repo's committed pool file. */
+async function getProblemPool(env) {
   const cached = await env.STATE.get("problems:list", "json");
-  if (cached && cached.problems?.length && Date.now() - cached.fetchedAt < WEEK_MS) {
-    return cached.problems;
+  // 30-day TTL: the pool is a candidate list; "already solved" freshness comes
+  // from the per-problem ac flags plus the recent-AC guard at pick time, so a
+  // slightly stale pool is safe and a weekly refetch would just repeat work.
+  if (cached?.problems?.length && Date.now() - cached.fetchedAt < 30 * 86400e3) return cached;
+
+  let pool = null;
+  try {
+    const r = await fetch(POOL_REPO_URL, { headers: { "user-agent": UA }, cf: { cacheTtl: 600 } });
+    if (r.ok) {
+      const j = await r.json();
+      // respect the repo file's own fetch date so the TTL tracks GH's refresh
+      if (j?.problems?.length) pool = { fetchedAt: j.fetchedAt || Date.now(), problems: j.problems };
+    }
+  } catch {
+    /* repo unavailable — fall through to stale KV */
   }
-  let problems = null;
-  for (const withAuth of [true, false]) {
-    const r = await fetch(`${LC}/api/problems/all/`, {
-      headers: withAuth ? lcHeaders(env) : { "user-agent": USER_AGENT, accept: "application/json" },
-    });
-    if (!r.ok) continue;
-    const data = await r.json();
-    problems = (data.stat_status_pairs || []).map((p) => ({
-      q: p.stat.question_id, // internal id (used by the submit endpoint)
-      f: p.stat.frontend_question_id, // the #N users see
-      s: p.stat.question__title_slug,
-      d: p.difficulty.level, // 1 Easy, 2 Medium, 3 Hard
-      p: !!p.paid_only, // premium problems are skipped
-    }));
-    break;
+  if (!pool && cached?.problems?.length) {
+    console.log("[pool] repo fetch failed; using stale KV pool");
+    return cached;
   }
-  if (!problems || !problems.length) {
-    if (cached?.problems?.length) return cached.problems;
-    throw new Error("could not fetch problem list");
+  if (!pool) throw new Error("no problem pool available");
+  await env.STATE.put("problems:list", JSON.stringify(pool));
+  return pool;
+}
+
+/** Slugs of the account's most recent Accepted submissions (freshness guard). */
+async function getRecentAcSlugs(env) {
+  try {
+    const j = await gql(
+      env,
+      `query { matchedUser { recentAcSubmissionList(limit: 50) { titleSlug } } }`,
+      {}
+    );
+    return (j.data?.matchedUser?.recentAcSubmissionList || []).map((s) => s.titleSlug);
+  } catch {
+    return []; // guard is best-effort only
   }
-  await env.STATE.put("problems:list", JSON.stringify({ fetchedAt: Date.now(), problems }));
-  return problems;
 }
 
 /** Question detail: statement + python3 starter code. */
@@ -128,20 +152,13 @@ async function submitSolution(env, slug, questionId, code) {
   throw new Error("submit: no submission id (rate limited?)");
 }
 
-/** Poll the judge until FINISHED or we run out of patience. */
-async function pollVerdict(env, sid, polls = POLLS) {
-  for (let i = 0; i < polls; i++) {
-    await sleep(POLL_MS);
-    try {
-      const r = await fetch(`${LC}/submissions/detail/${sid}/check/`, { headers: lcHeaders(env) });
-      if (!r.ok) continue;
-      const j = await r.json();
-      // LeetCode marks completed judging with state "SUCCESS" (older "FINISHED" kept for safety)
-      if (j.state === "SUCCESS" || j.state === "FINISHED") return j;
-    } catch {
-      /* transient; keep polling */
-    }
-  }
+/** One judge poll. Returns the verdict object when judging reached a terminal state. */
+async function checkOnce(env, sid) {
+  const r = await fetch(`${LC}/submissions/detail/${sid}/check/`, { headers: lcHeaders(env) });
+  if (!r.ok) return null;
+  const j = await r.json();
+  // LeetCode marks completed judging with state "SUCCESS" (older "FINISHED" kept for safety)
+  if (j.state === "SUCCESS" || j.state === "FINISHED") return j;
   return null;
 }
 
@@ -168,10 +185,10 @@ function buildPrompt(statement, starter, feedback, prevCode) {
     `PROBLEM:\n${statement.slice(0, 8000)}\n\n` +
     `CODE TEMPLATE (must keep the same class and method names):\n${starter}\n\n` +
     `RULES:\n` +
-    `- Output ONLY the complete Python 3 code, with no markdown fences and no explanations outside code.\n` +
+    `- Output ONLY the complete Python 3 code, no markdown fences, no prose.\n` +
     `- No imports unless absolutely necessary.\n` +
-    `- Add a short comment above each nontrivial line explaining what it does.\n` +
-    `- The solution must be efficient enough to satisfy the constraints (avoid naive O(n^2) when n is large).\n`;
+    `- At most 5 very short comments at the trickiest lines (brevity matters — long answers get truncated).\n` +
+    `- Must be efficient enough to satisfy the constraints.\n`;
   if (feedback) {
     p +=
       `\nYour previous attempt FAILED the judge with this feedback:\n${feedback.slice(0, 1200)}\n\n` +
@@ -223,25 +240,23 @@ function describeFailure(v) {
       "Your output: " +
         String(Array.isArray(v.code_output) ? v.code_output.join(" | ") : v.code_output).slice(0, 300)
     );
-  parts.push(
-    `Status: ${v.status_msg} (${v.total_correct}/${v.total_testcases} tests passed)`
-  );
+  parts.push(`Status: ${v.status_msg} (${v.total_correct}/${v.total_testcases} tests passed)`);
   return parts.join("\n");
 }
 
-/* ---------------- pick + solve ---------------- */
+/* ---------------- pick ---------------- */
 
 /**
- * Random pick among free + unsolved problems, weighted by difficulty
+ * Random pick among free + not-solved problems, weighted by difficulty
  * (~30% Easy / 45% Medium / 25% Hard). Skips problems attempted in the
  * last 7 days so a failure doesn't hog tomorrow's slot.
  */
-function pickProblem(problems, solved, attempted) {
+function pickProblem(pool, solved, attempted, recentAc) {
   const cutoff = Date.now() - WEEK_MS;
   const byDiff = { 1: [], 2: [], 3: [] };
-  const solvedSet = new Set(solved);
-  for (const p of problems) {
-    if (p.p || solvedSet.has(p.s)) continue;
+  const solvedSet = new Set([...solved, ...recentAc]);
+  for (const p of pool.problems) {
+    if (p.p || p.ac || solvedSet.has(p.s)) continue;
     if (attempted[p.s] && attempted[p.s] > cutoff) continue;
     (byDiff[p.d] || byDiff[2]).push(p);
   }
@@ -261,135 +276,216 @@ function pickProblem(problems, solved, attempted) {
   return byDiff[chosen][Math.floor(Math.random() * byDiff[chosen].length)];
 }
 
-/**
- * The solve loop: up to MAX_ATTEMPTS, feeding judge feedback between tries.
- * Returns { accepted, question, code, sid, verdict, logs }.
- */
-async function solveProblem(env, slug) {
-  const q = await getQuestion(env, slug);
-  const statement = htmlToText(q.content || "");
-  const starter = (q.codeSnippets || []).find((c) => c.langSlug === "python3")?.code || "";
-  const logs = [];
-  let feedback = null;
-  let prevCode = null;
-  let lastCode = null;
-  let lastSid = null;
-  let lastVerdict = null;
+/* ---------------- state machine ---------------- */
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    let aiText;
-    try {
-      aiText = await askAI(env, buildPrompt(statement, starter, feedback, prevCode));
-    } catch (e) {
-      logs.push({ attempt, status: "ai_error", error: String(e).slice(0, 200) });
-      break;
-    }
-    let code;
-    try {
-      code = extractCode(aiText);
-    } catch (e) {
-      logs.push({ attempt, status: "parse_error", error: String(e).slice(0, 200) });
-      feedback = "Your reply could not be parsed as code. Reply with ONLY the Python code.";
-      continue;
-    }
-    lastCode = code;
-
-    let sid;
-    try {
-      sid = await submitSolution(env, slug, q.questionId, code);
-    } catch (e) {
-      logs.push({ attempt, status: "submit_error", error: String(e).slice(0, 200) });
-      break; // submit endpoint is failing; don't burn more attempts
-    }
-    lastSid = sid;
-
-    let verdict = await pollVerdict(env, sid);
-    if (!verdict && attempt === MAX_ATTEMPTS) {
-      verdict = await pollVerdict(env, sid, 3); // one last patient check
-    }
-    const accepted = verdict?.status_msg === "Accepted";
-    lastVerdict = verdict;
-    logs.push({
-      attempt,
-      status: verdict?.status_msg || "judge_timeout",
-      correct: verdict?.total_correct ?? null,
-      total: verdict?.total_testcases ?? null,
-    });
-    if (accepted) {
-      return { accepted: true, question: q, code, sid, verdict, logs };
-    }
-    feedback = describeFailure(verdict);
-    prevCode = code;
-  }
-  return { accepted: false, question: q, code: lastCode, sid: lastSid, verdict: lastVerdict, logs };
+async function saveRun(env, s) {
+  await env.STATE.put("run:state", JSON.stringify(s));
 }
 
-/* ---------------- daily orchestration ---------------- */
-
-/**
- * One day's full run. Idempotent per IST date unless force=true.
- */
-async function runDaily(env, force = false) {
-  const date = istDate();
-  if (date > END_DATE) return { skipped: "season-over", date };
-
-  if (!force) {
-    const existing = await env.STATE.get(`today:${date}`, "json");
-    if (existing) return { skipped: "already-ran-today", today: existing };
-  }
-
-  const startedAt = new Date().toISOString();
-  const problems = await getProblemList(env);
-  const solved = (await env.STATE.get("solved:list", "json")) || [];
-  const attempted = (await env.STATE.get("attempted:map", "json")) || {};
-  const pick = pickProblem(problems, solved, attempted);
-  if (!pick) return { skipped: "pool-exhausted", date };
-
-  console.log(`[lc-daily] ${date} picked ${pick.s} (${DIFF_NAMES[pick.d]}, #${pick.f})`);
-
-  let result;
-  try {
-    result = await solveProblem(env, pick.s);
-  } catch (e) {
-    result = { accepted: false, logs: [], error: String(e).slice(0, 300) };
-  }
-  console.log(`[lc-daily] ${date} ${pick.s} -> ${result.accepted ? "ACCEPTED" : "failed"}`);
-
+/** Terminal step: persist the day's record everywhere and go idle. */
+async function finishRun(env, s, extra) {
   const record = {
-    date,
-    slug: pick.s,
-    frontendId: result.question?.questionFrontendId || pick.f,
-    title: result.question?.title || pick.s,
-    difficulty: DIFF_NAMES[pick.d],
-    accepted: !!result.accepted,
-    attempts: result.logs?.length || 0,
-    log: result.logs || [],
-    runtime: result.verdict?.runtime_display || null,
-    submissionId: result.sid || null,
-    code: result.code || null,
-    error: result.error || null,
-    startedAt,
+    date: s.date,
+    slug: s.slug || null,
+    frontendId: s.f || null,
+    title: s.title || s.slug || null,
+    difficulty: s.d ? DIFF_NAMES[s.d] : null,
+    accepted: !!s.accepted,
+    attempts: (s.logs || []).length,
+    log: s.logs || [],
+    runtime: s.runtime || null,
+    submissionId: s.sid || null,
+    code: s.code || null,
+    error: s.error || null,
+    startedAt: s.startedAt,
     finishedAt: new Date().toISOString(),
+    ...extra,
   };
 
-  // persist state
-  const ops = [env.STATE.put(`today:${date}`, JSON.stringify(record))];
-  // only count a problem as "attempted" if we actually submitted at least once
-  if (record.attempts > 0) attempted[pick.s] = Date.now();
-  if (result.accepted && !solved.includes(pick.s)) solved.push(pick.s);
+  const solved = (await env.STATE.get("solved:list", "json")) || [];
+  const attempted = (await env.STATE.get("attempted:map", "json")) || {};
+  if (record.attempts > 0 && record.slug) attempted[record.slug] = Date.now();
+  if (record.accepted && record.slug && !solved.includes(record.slug)) solved.push(record.slug);
+
+  const ops = [env.STATE.put(`today:${s.date}`, JSON.stringify(record))];
   ops.push(env.STATE.put("attempted:map", JSON.stringify(attempted)));
   ops.push(env.STATE.put("solved:list", JSON.stringify(solved)));
   ops.push(
     env.STATE.get("history:list", "json").then((h) =>
-      env.STATE.put(
-        "history:list",
-        JSON.stringify([...(h || []), record].slice(-120))
-      )
+      env.STATE.put("history:list", JSON.stringify([...(h || []), record].slice(-120)))
     )
   );
+  ops.push(env.STATE.delete("run:state"));
   await Promise.all(ops);
+  console.log(`[run] ${s.date} ${s.slug} -> ${record.accepted ? "ACCEPTED" : "failed"} (${record.attempts} attempts)`);
+}
 
-  return record;
+/** Execute exactly one machine step. `s` is the persisted run-state. */
+async function step(env, s) {
+  // stale-run guard: a run stuck for over an hour is force-finished
+  if (Date.now() - new Date(s.startedAt).getTime() > RUN_STALE_MS && s.phase !== "record") {
+    s.error = `run stalled in phase ${s.phase}; force-finished`;
+    console.log(`[run] stale: ${s.error}`);
+    await finishRun(env, s, {});
+    return;
+  }
+
+  switch (s.phase) {
+    case "pick": {
+      const pool = await getProblemPool(env);
+      const solved = (await env.STATE.get("solved:list", "json")) || [];
+      const attempted = (await env.STATE.get("attempted:map", "json")) || {};
+      const recentAc = await getRecentAcSlugs(env);
+      const pick = pickProblem(pool, solved, attempted, recentAc);
+      if (!pick) {
+        s.error = "no eligible problems left — pool exhausted";
+        s.phase = "record";
+        await saveRun(env, s);
+        return;
+      }
+      const q = await getQuestion(env, pick.s);
+      s.slug = pick.s;
+      s.f = q.questionFrontendId ?? pick.f;
+      s.title = q.title;
+      s.d = pick.d;
+      s.qid = q.questionId;
+      s.statement = htmlToText(q.content || "").slice(0, 9000);
+      s.starter = (q.codeSnippets || []).find((c) => c.langSlug === "python3")?.code || "";
+      s.logs = [];
+      s.attempt = 1;
+      s.phase = "ai";
+      console.log(`[run] ${s.date} picked #${s.f} ${s.slug} (${DIFF_NAMES[s.d]})`);
+      await saveRun(env, s);
+      return;
+    }
+
+    case "ai": {
+      let text;
+      try {
+        text = await askAI(env, buildPrompt(s.statement, s.starter, s.feedback, s.prevCode));
+        s.code = extractCode(text);
+      } catch (e) {
+        const msg = String(e).slice(0, 250);
+        s.logs.push({ attempt: s.attempt, status: /no code|parse/i.test(msg) ? "parse_error" : "ai_error", error: msg });
+        console.log(`[run] ai error on attempt ${s.attempt}: ${msg}`);
+        s.phase = s.attempt >= MAX_ATTEMPTS ? "record" : "ai";
+        s.attempt = s.attempt >= MAX_ATTEMPTS ? s.attempt : s.attempt + 1;
+        await saveRun(env, s);
+        return;
+      }
+      s.phase = "submit";
+      await saveRun(env, s);
+      return;
+    }
+
+    case "submit": {
+      try {
+        s.sid = await submitSolution(env, s.slug, s.qid, s.code);
+      } catch (e) {
+        const msg = String(e).slice(0, 250);
+        s.logs.push({ attempt: s.attempt, status: "submit_error", error: msg });
+        console.log(`[run] submit error: ${msg}`);
+        s.phase = "record";
+        await saveRun(env, s);
+        return;
+      }
+      s.prevCode = s.code;
+      s.polls = 0;
+      s.phase = "poll";
+      console.log(`[run] submitted attempt ${s.attempt} sid=${s.sid}`);
+      await saveRun(env, s);
+      return;
+    }
+
+    case "poll": {
+      let verdict = null;
+      try {
+        verdict = await checkOnce(env, s.sid);
+      } catch {
+        verdict = null;
+      }
+      if (!verdict) {
+        s.polls = (s.polls || 0) + 1;
+        if (s.polls < MAX_POLLS) {
+          await saveRun(env, s); // stay in poll; next tick re-checks
+          return;
+        }
+        s.logs.push({ attempt: s.attempt, status: "judge_timeout" });
+        s.feedback = describeFailure(null);
+        s.accepted = false;
+        if (s.attempt >= MAX_ATTEMPTS) {
+          s.phase = "record";
+        } else {
+          s.attempt++;
+          s.phase = "ai";
+        }
+        await saveRun(env, s);
+        return;
+      }
+      const accepted = verdict?.status_msg === "Accepted";
+      s.runtime = verdict?.runtime_display || null;
+      s.logs.push({
+        attempt: s.attempt,
+        status: verdict?.status_msg || "unknown",
+        correct: verdict?.total_correct ?? null,
+        total: verdict?.total_testcases ?? null,
+      });
+      console.log(`[run] judge attempt ${s.attempt}: ${verdict?.status_msg} (${verdict?.total_correct}/${verdict?.total_testcases})`);
+      if (accepted) {
+        s.accepted = true;
+        s.phase = "record";
+      } else {
+        s.feedback = describeFailure(verdict);
+        s.accepted = false;
+        if (s.attempt >= MAX_ATTEMPTS) s.phase = "record";
+        else {
+          s.attempt++;
+          s.phase = "ai";
+        }
+      }
+      await saveRun(env, s);
+      return;
+    }
+
+    case "record": {
+      await finishRun(env, s, {});
+      return;
+    }
+
+    default: {
+      s.error = `unknown phase ${s.phase}; force-finished`;
+      console.log(`[run] ${s.error}`);
+      await finishRun(env, s, {});
+      return;
+    }
+  }
+}
+
+/** Called by the cron and by /run. Starts a run when the day's gate allows. */
+async function tick(env, force = false) {
+  const date = istDate();
+  if (date > END_DATE) return { skipped: "season-over", date };
+
+  const existing = await env.STATE.get("run:state", "json");
+  if (existing) {
+    await step(env, existing);
+    return { stepped: existing.phase, date };
+  }
+
+  const nowMin = new Date().getUTCHours() * 60 + new Date().getUTCMinutes();
+  const todayRecord = await env.STATE.get(`today:${date}`, "json");
+  if (todayRecord && !force) return { skipped: "already-ran-today", date };
+  if (nowMin < START_UTC_MIN && !force) return { skipped: "before-03:31-utc", date };
+
+  const s = {
+    date,
+    phase: "pick",
+    startedAt: new Date().toISOString(),
+    logs: [],
+  };
+  await env.STATE.put("run:state", JSON.stringify(s));
+  console.log(`[run] ${date} run started (force=${force})`);
+  return { started: true, date };
 }
 
 /* ---------------- dashboard ---------------- */
@@ -548,11 +644,11 @@ function renderDashboard({ today, history, solvedCount, problemsCount }) {
     }
   </div>
 
-  <footer>Cloudflare Workers · Workers AI · KV state · cron 30 3 * * * UTC</footer>
+  <footer>Cloudflare Workers · Workers AI · KV state machine · cron every minute (daily gate 03:31 UTC)</footer>
 </main></body></html>`;
 }
 
-/* ---------------- fetch handler ---------------- */
+/* ---------------- handlers ---------------- */
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj, null, 2), {
@@ -563,9 +659,23 @@ function json(obj, status = 200) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      runDaily(env).catch((e) => console.error("[lc-daily] cron failed:", String(e)))
-    );
+    // every minute: one small step; never let an exception kill the tick
+    try {
+      await tick(env, false);
+    } catch (e) {
+      console.error("[tick] failed:", String(e).slice(0, 300));
+      // if a step blew up, mark the run so the next tick force-finishes it
+      try {
+        const s = await env.STATE.get("run:state", "json");
+        if (s && !s.error) {
+          s.error = `step error in ${s.phase}: ${String(e).slice(0, 200)}`;
+          s.phase = s.phase === "record" ? "record" : "record";
+          await env.STATE.put("run:state", JSON.stringify(s));
+        }
+      } catch {
+        /* nothing more we can do this tick */
+      }
+    }
   },
 
   async fetch(request, env, ctx) {
@@ -576,20 +686,20 @@ export default {
       const secret = url.searchParams.get("secret") || request.headers.get("x-trigger-secret");
       if (!env.TRIGGER_SECRET || secret !== env.TRIGGER_SECRET) return json({ error: "forbidden" }, 403);
       const force = url.searchParams.get("force") === "1";
-      ctx.waitUntil(
-        runDaily(env, force).catch((e) => console.error("[lc-daily] manual run failed:", String(e)))
-      );
-      return json({ started: true, date: istDate(), forced: force });
+      // queue the run; the next cron tick executes steps (free-plan safe)
+      const res = await tick(env, force).catch((e) => ({ error: String(e).slice(0, 200) }));
+      return json(res);
     }
 
     if (url.pathname === "/api/state") {
       const date = istDate();
       try {
-        const [today, history, solved, problems] = await Promise.all([
+        const [today, history, solved, problems, run] = await Promise.all([
           env.STATE.get(`today:${date}`, "json"),
           env.STATE.get("history:list", "json"),
           env.STATE.get("solved:list", "json"),
           env.STATE.get("problems:list", "json"),
+          env.STATE.get("run:state", "json"),
         ]);
         return json({
           date,
@@ -598,6 +708,7 @@ export default {
           history: history || [],
           accountSolved: (solved || []).length,
           poolSize: problems?.problems?.length ?? null,
+          run: run ? { phase: run.phase, slug: run.slug, attempt: run.attempt } : null,
         });
       } catch (e) {
         return json({ error: String(e).slice(0, 200) }, 500);

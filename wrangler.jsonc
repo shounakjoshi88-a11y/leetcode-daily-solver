@@ -3,12 +3,12 @@
   "name": "leetcode-daily-solver",
   "main": "src/worker.js",
   "compatibility_date": "2026-01-01",
-  // daily run at 09:00 IST == 03:30 UTC
+  // state machine heartbeat: every minute; the daily gate (03:31 UTC) starts the run
   "triggers": {
-    "crons": ["30 3 * * *"]
+    "crons": ["* * * * *"]
   },
   "kv_namespaces": [
-    { "binding": "STATE", "id": "REPLACE_WITH_KV_ID" }
+    { "binding": "STATE", "id": "235b0632dc9e4cef951c9c219e718ffa" }
   ],
   "ai": { "binding": "AI" },
   "observability": { "enabled": true }
