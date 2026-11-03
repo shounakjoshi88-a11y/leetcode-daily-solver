@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 /**
- * LeetCode Daily Solver — GitHub Actions runner (Node 20, zero deps).
+ * One A Day — GitHub Actions backup runner (Node 20, zero deps).
  *
- * Daily flow (see docs/superpowers/specs/2026-11-02-leetcode-daily-solver-design.md):
+ * NOTE 2026-11-03: the scheduled GH cron is DISABLED — the Cloudflare Worker
+ * (src/worker.js) is the daily runner. This script stays as a manual backup
+ * (Actions tab → daily-solve → Run workflow) and provides the --render mode
+ * used to rebuild the static Pages dashboards from state files.
+ *
+ * Daily flow (see docs/superpowers/specs/2026-11-02-one-a-day-design.md):
  *   1. gate: stop after 2026-12-31; skip if today's run already recorded (unless forced)
  *   2. load problem pool from state/problems.json (refresh weekly; seeds solved-set from AC statuses)
  *   3. pick a random unsolved problem weighted ~30% Easy / 45% Medium / 25% Hard
@@ -485,7 +490,7 @@ function renderHtml({ today, history, accountSolved, poolSize }) {
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LeetCode Daily Solver</title>
+<title>One A Day</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -518,8 +523,8 @@ function renderHtml({ today, history, accountSolved, poolSize }) {
   footer { color: #6e7681; font-size: 12.5px; margin-top: 30px; }
 </style>
 </head><body><main>
-  <h1>LeetCode Daily Solver<span class="dot">_</span></h1>
-  <div class="sub">One random unsolved problem every day at 9:00 AM IST, solved by AI and submitted to leetcode.com — through Dec 31, 2026. No repeats.</div>
+  <h1>One A Day<span class="dot">_</span></h1>
+  <div class="sub">One random unsolved coding problem every day at 9:00 AM IST, solved by AI and submitted to my online-judge account — through Dec 31, 2026. No repeats.</div>
   <div class="chips">
     <div class="chip"><div class="n">${acceptedCount}</div><div class="l">solved by bot</div></div>
     <div class="chip"><div class="n">${streak}🔥</div><div class="l">streak</div></div>
@@ -545,7 +550,7 @@ function renderMarkdown({ today, history, accountSolved, poolSize }) {
   const line = (h) =>
     `| ${h.date} | [#${h.frontendId} ${h.title.replace(/\|/g, "\\|")}](https://leetcode.com/problems/${h.slug}/) | ${em[h.difficulty] || ""} ${h.difficulty} | ${h.accepted ? "✅" : "❌"} (${h.attempts}×) | ${h.runtime || "—"} |`;
   let md =
-    `# 🤖 LeetCode Daily Solver\n\n` +
+    `# 🤖 One A Day\n\n` +
     `One random unsolved LeetCode problem a day (9:00 AM IST), solved by an LLM and submitted to the account — through Dec 31, 2026. No repeats.\n\n` +
     `| Solved by bot | Streak | Success rate | Account AC | Pool |\n|---|---|---|---|---|\n` +
     `| ${acceptedCount} | ${streak}🔥 | ${rate}% | ${accountSolved ?? "—"} | ${poolSize ?? "—"} |\n\n`;

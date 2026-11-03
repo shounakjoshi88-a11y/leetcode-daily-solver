@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "leetcode-daily-solver",
+  "name": "one-a-day",
   "main": "src/worker.js",
   "compatibility_date": "2026-01-01",
   // state machine heartbeat: every minute; the daily gate (03:31 UTC) starts the run

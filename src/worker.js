@@ -1,5 +1,5 @@
 /**
- * LeetCode Daily Solver — autonomous "1 problem a day" bot (Cloudflare Workers, free plan).
+ * One A Day — autonomous daily coding-problem bot (Cloudflare Workers, free plan).
  *
  * Free-plan limits force a step-machine design: 10 ms CPU per invocation and
  * ~30 s of waitUntil after an HTTP response make a monolithic solve loop
@@ -35,7 +35,7 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const DIFF_NAMES = { 1: "Easy", 2: "Medium", 3: "Hard" };
 const POOL_REPO_URL =
-  "https://raw.githubusercontent.com/shounakjoshi88-a11y/leetcode-daily-solver/main/state/problems.json";
+  "https://raw.githubusercontent.com/shounakjoshi88-a11y/one-a-day/main/state/problems.json";
 
 /* ---------------- time helpers ---------------- */
 
@@ -588,7 +588,7 @@ function renderDashboard({ today, history, solvedCount, problemsCount }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="600">
-<title>LeetCode Daily Solver</title>
+<title>One A Day</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -621,8 +621,8 @@ function renderDashboard({ today, history, solvedCount, problemsCount }) {
   footer { color: #6e7681; font-size: 12.5px; margin-top: 30px; }
 </style>
 </head><body><main>
-  <h1>LeetCode Daily Solver<span class="dot">_</span></h1>
-  <div class="sub">One random unsolved problem every day at 9:00 AM IST, solved by AI and submitted to leetcode.com — through Dec 31, 2026. No repeats.</div>
+  <h1>One A Day<span class="dot">_</span></h1>
+  <div class="sub">One random unsolved coding problem every day at 9:00 AM IST, solved by AI and submitted to my online-judge account — through Dec 31, 2026. No repeats.</div>
 
   <div class="chips">
     <div class="chip"><div class="n">${acceptedCount}</div><div class="l">solved by bot</div></div>

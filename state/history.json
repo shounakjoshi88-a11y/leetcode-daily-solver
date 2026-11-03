@@ -19,5 +19,28 @@
     "startedAt": "2026-11-02T17:04:29.039Z",
     "finishedAt": "2026-11-02T17:32:47.487Z",
     "runtime": "0 ms"
+  },
+  {
+    "date": "2026-11-03",
+    "slug": "shortest-subarray-with-or-at-least-k-ii",
+    "frontendId": "3097",
+    "title": "Shortest Subarray With OR at Least K II",
+    "difficulty": "Medium",
+    "accepted": true,
+    "attempts": 1,
+    "log": [
+      {
+        "attempt": 1,
+        "status": "Accepted",
+        "correct": 718,
+        "total": 718
+      }
+    ],
+    "runtime": null,
+    "submissionId": 2188192703,
+    "code": "class Solution:\n    def minimumSubarrayLength(self, nums: List[int], k: int) -> int:\n        count = [0] * 32  # Track bit counts\n        current_or = 0\n        left = 0\n        result = float('inf')\n        \n        for right in range(len(nums)):\n            num = nums[right]\n            current_or |= num\n            for i in range(32):\n                if num & (1 << i):\n                    count[i] += 1\n            \n            while current_or >= k and left <= right:\n                result = min(result, right - left + 1)\n                num_left = nums[left]\n                for i in range(32):\n                    if num_left & (1 << i):\n                        count[i] -= 1\n                        if count[i] == 0:\n                            current_or &= ~(1 << i)  # Clear bit if no more contributions\n                left += 1\n        \n        return result if result != float('inf') else -1\n",
+    "error": null,
+    "startedAt": "2026-11-03T01:59:55.751Z",
+    "finishedAt": "2026-11-03T02:09:49.165Z"
   }
 ]

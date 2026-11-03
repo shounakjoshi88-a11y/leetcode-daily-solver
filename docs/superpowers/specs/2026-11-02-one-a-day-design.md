@@ -1,4 +1,4 @@
-# Design — LeetCode Daily Solver
+# Design — One A Day
 
 Date: 2026-11-02 · Owner: Shounak (full autonomy delegated; design decisions recorded here)
 
